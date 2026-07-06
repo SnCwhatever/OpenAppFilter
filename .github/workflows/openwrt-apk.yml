@@ -46,6 +46,10 @@ jobs:
           cd "${SDK_DIR}"
           echo "CONFIG_PACKAGE_luci-app-oaf=y" >> .config
           make defconfig
+          make package/libs/libubox/compile V=s
+          make package/system/ubus/compile V=s
+          make package/system/uci/compile V=s
+          make package/libs/json-c/compile V=s
           make package/OpenAppFilter/oaf/compile V=s
           make package/OpenAppFilter/open-app-filter/compile V=s
           make package/OpenAppFilter/luci-app-oaf/compile V=s
