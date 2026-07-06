@@ -40,19 +40,18 @@ jobs:
           SDK_DIR="$(find "$PWD" -maxdepth 1 -type d -name 'openwrt-sdk-*' | head -n 1)"
           test -n "${SDK_DIR}"
 
+          cd "${SDK_DIR}"
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
           mkdir -p "${SDK_DIR}/package/OpenAppFilter"
+          cd "${GITHUB_WORKSPACE}"
           cp -a open-app-filter oaf luci-app-oaf "${SDK_DIR}/package/OpenAppFilter/"
 
           cd "${SDK_DIR}"
           echo "CONFIG_PACKAGE_luci-app-oaf=y" >> .config
           make defconfig
-          make package/libs/libubox/compile V=s
-          make package/system/ubus/compile V=s
-          make package/system/uci/compile V=s
-          make package/libs/json-c/compile V=s
-          make package/OpenAppFilter/oaf/compile V=s
-          make package/OpenAppFilter/open-app-filter/compile V=s
-          make package/OpenAppFilter/luci-app-oaf/compile V=s
+          make package/compile V=s
 
           cd "${GITHUB_WORKSPACE}"
           mkdir -p out
