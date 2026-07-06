@@ -1,0 +1,70 @@
+name: Build OpenWrt APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: openwrt-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SDK_URL: https://downloads.openwrt.org/releases/25.12.5/targets/mediatek/filogic/openwrt-sdk-25.12.5-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+  SDK_SHA256: ff4a38a397caa2cfe1c39e18f84ddede14878221b3593c3f2c4cfe24e3ec4c25
+
+jobs:
+  build:
+    name: Build mediatek/filogic aarch64_cortex-a53 APKs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download OpenWrt SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y zstd
+          curl -fL --retry 3 -o sdk.tar.zst "${SDK_URL}"
+          echo "${SDK_SHA256}  sdk.tar.zst" | sha256sum -c -
+          tar --zstd -xf sdk.tar.zst
+
+      - name: Build OpenAppFilter APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_DIR="$(find "$PWD" -maxdepth 1 -type d -name 'openwrt-sdk-*' | head -n 1)"
+          test -n "${SDK_DIR}"
+
+          mkdir -p "${SDK_DIR}/package/OpenAppFilter"
+          cp -a open-app-filter oaf luci-app-oaf "${SDK_DIR}/package/OpenAppFilter/"
+
+          cd "${SDK_DIR}"
+          echo "CONFIG_PACKAGE_luci-app-oaf=y" >> .config
+          make defconfig
+          make package/OpenAppFilter/oaf/compile V=s
+          make package/OpenAppFilter/open-app-filter/compile V=s
+          make package/OpenAppFilter/luci-app-oaf/compile V=s
+
+          cd "${GITHUB_WORKSPACE}"
+          mkdir -p out
+          find "${SDK_DIR}/bin" -type f \( \
+            -name 'appfilter-*.apk' -o \
+            -name 'kmod-oaf-*.apk' -o \
+            -name 'luci-app-oaf-*.apk' \
+          \) -print -exec cp {} out/ \;
+          test "$(find out -type f -name '*.apk' | wc -l)" -gt 0
+          sha256sum out/*.apk | tee out/SHA256SUMS
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openappfilter-openwrt-25.12.5-mediatek-filogic-aarch64_cortex-a53
+          path: |
+            out/*.apk
+            out/SHA256SUMS
+          if-no-files-found: error
